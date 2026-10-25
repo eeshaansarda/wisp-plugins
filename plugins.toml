@@ -1,0 +1,10 @@
+# The wisp list: every plugin `plugin install <id>` finds, each built by CI from the commit its
+# source is pinned to (README.md). A change here is reviewed as a pull request.
+
+# The wisp whose `wisp plugin check` every plugin must pass.
+[wisp]
+source = "github:eeshaansarda/wisp@264af728b01682cf9c422b7b23ee6fbb680c5b5f"
+
+[[plugin]]
+id = "timers"
+source = "github:eeshaansarda/wisp@264af728b01682cf9c422b7b23ee6fbb680c5b5f#plugins/timers"
