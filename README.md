@@ -37,4 +37,4 @@ python3 scripts/build.py --out dist --release try
 
 `--local eeshaansarda/wisp=../wisp` builds a repository from a folder on this computer instead of its pinned commit, to try a change before it is pushed.
 
-A source in a private repository (wisp itself, while it is private) is fetched with the repository secret `SOURCE_TOKEN`, a read-only token, in a CI step of its own: no plugin's build runs while it is set.
+wisp itself is private: CI fetches its pinned commit over SSH with the read-only deploy key in the repository secret `SOURCE_DEPLOY_KEY`, checked against GitHub's published host keys, in a step of its own; no plugin's build runs while the key is there.

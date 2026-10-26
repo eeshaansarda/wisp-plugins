@@ -7,13 +7,12 @@ wisp itself, into one folder ready to publish as a release (each <id>.wasm and i
 --local OWNER/REPO=FOLDER builds that repository from a folder on this computer instead of its
 pinned commit, to try a change before it is pushed; the index then says so in each source.
 
---fetch-only fetches every pinned source and stops. A source in a private repository is fetched
-with SOURCE_TOKEN from the environment, a read-only token: CI sets it for that step alone, so no
-plugin's build ever runs with it.
+--fetch-only fetches every pinned source and stops. The repositories named in SOURCE_SSH_REPOS
+(private ones, such as wisp itself) are fetched over SSH, with the read-only deploy key CI gives
+that step alone through GIT_SSH_COMMAND, so no plugin's build ever runs with it.
 """
 
 import argparse
-import base64
 import hashlib
 import os
 import json
@@ -58,11 +57,9 @@ def checkout(repo, commit, work, local):
     if not folder.exists():
         folder.mkdir(parents=True)
         run(["git", "init", "-q"], folder)
-        auth = []
-        if token := os.environ.get("SOURCE_TOKEN"):
-            basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
-            auth = ["-c", f"http.extraheader=AUTHORIZATION: basic {basic}"]
-        run(["git", *auth, "fetch", "-q", "--depth", "1", f"https://github.com/{repo}", commit], folder)
+        private = repo in os.environ.get("SOURCE_SSH_REPOS", "").split()
+        url = f"git@github.com:{repo}.git" if private else f"https://github.com/{repo}"
+        run(["git", "fetch", "-q", "--depth", "1", url, commit], folder)
         run(["git", "checkout", "-q", "FETCH_HEAD"], folder)
     return folder
 
