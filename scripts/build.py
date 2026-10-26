@@ -6,10 +6,16 @@ wisp itself, into one folder ready to publish as a release (each <id>.wasm and i
 
 --local OWNER/REPO=FOLDER builds that repository from a folder on this computer instead of its
 pinned commit, to try a change before it is pushed; the index then says so in each source.
+
+--fetch-only fetches every pinned source and stops. A source in a private repository is fetched
+with SOURCE_TOKEN from the environment, a read-only token: CI sets it for that step alone, so no
+plugin's build ever runs with it.
 """
 
 import argparse
+import base64
 import hashlib
+import os
 import json
 import re
 import shutil
@@ -52,7 +58,11 @@ def checkout(repo, commit, work, local):
     if not folder.exists():
         folder.mkdir(parents=True)
         run(["git", "init", "-q"], folder)
-        run(["git", "fetch", "-q", "--depth", "1", f"https://github.com/{repo}", commit], folder)
+        auth = []
+        if token := os.environ.get("SOURCE_TOKEN"):
+            basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+            auth = ["-c", f"http.extraheader=AUTHORIZATION: basic {basic}"]
+        run(["git", *auth, "fetch", "-q", "--depth", "1", f"https://github.com/{repo}", commit], folder)
         run(["git", "checkout", "-q", "FETCH_HEAD"], folder)
     return folder
 
@@ -116,8 +126,9 @@ def toml_string(text):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--release", required=True, help="the tag of the release the files will be attached to")
+    parser.add_argument("--out", type=Path)
+    parser.add_argument("--release", help="the tag of the release the files will be attached to")
+    parser.add_argument("--fetch-only", action="store_true", help="fetch every pinned source and stop")
     parser.add_argument("--notes", type=Path, help="where to write the release's notes")
     parser.add_argument("--local", action="append", default=[], metavar="OWNER/REPO=FOLDER")
     args = parser.parse_args()
@@ -128,10 +139,18 @@ def main():
         local[repo] = Path(folder).resolve()
     listed = tomllib.loads((ROOT / "plugins.toml").read_text())
     work = ROOT / "work"
+    wisp_repo, wisp_commit, _ = source(listed["wisp"]["source"], "[wisp]")
+    if args.fetch_only:
+        checkout(wisp_repo, wisp_commit, work, local)
+        for plugin in listed.get("plugin", []):
+            repo, commit, _ = source(plugin["source"], plugin["id"])
+            checkout(repo, commit, work, local)
+        return
+    if args.out is None or args.release is None:
+        fail("--out and --release are needed to build")
     shutil.rmtree(args.out, ignore_errors=True)
     args.out.mkdir(parents=True)
 
-    wisp_repo, wisp_commit, _ = source(listed["wisp"]["source"], "[wisp]")
     wisp = build_wisp(checkout(wisp_repo, wisp_commit, work, local))
 
     entries, rows, seen = [], [], set()

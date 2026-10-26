@@ -1,3 +1,4 @@
 dist/
 work/
 notes.md
+__pycache__/
